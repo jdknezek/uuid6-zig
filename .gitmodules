@@ -1,0 +1,3 @@
+[submodule "examples/bench/lib/zig-clap"]
+	path = examples/bench/lib/zig-clap
+	url = https://github.com/hejsil/zig-clap
