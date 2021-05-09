@@ -16,6 +16,7 @@ pub fn build(b: *std.build.Builder) void {
     exe.addPackagePath("uuid", "../../src/Uuid.zig");
     exe.setTarget(target);
     exe.setBuildMode(mode);
+    if (b.option(bool, "single-threaded", "Single-threaded optimizations")) |st| exe.single_threaded = st;
     exe.install();
 
     const run_cmd = exe.run();

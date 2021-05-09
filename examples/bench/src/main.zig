@@ -3,7 +3,11 @@ const clap = @import("clap");
 const Uuid = @import("uuid");
 
 pub fn main() anyerror!void {
+    const stderr = std.io.getStdErr().writer();
+    const stdout = std.io.getStdOut().writer();
+
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer if (gpa.deinit()) std.fmt.format(stderr, "WARNING: memory leak!\n", .{}) catch unreachable;
     const allocator = &gpa.allocator;
 
     const nanos = std.time.nanoTimestamp();
@@ -12,9 +16,6 @@ pub fn main() anyerror!void {
     const random = &rng.random;
 
     Uuid.v1.clock.seed(random.int(u64));
-
-    const stdErr = std.io.getStdErr().writer();
-    const stdOut = std.io.getStdOut().writer();
 
     const params = comptime [_]clap.Param(clap.Help){
         clap.parseParam("-h, --help         Display this help and exit.") catch unreachable,
@@ -28,17 +29,17 @@ pub fn main() anyerror!void {
     defer args.deinit();
 
     if (args.flag("--help")) {
-        try clap.help(stdOut, &params);
+        try clap.help(stdout, &params);
         return;
     }
 
     const version_flag = args.option("--version") orelse {
-        try std.fmt.format(stdErr, "ERROR: version is required\n", .{});
+        try std.fmt.format(stderr, "ERROR: version is required\n", .{});
         std.process.exit(1);
     };
 
     const version = std.fmt.parseUnsigned(u4, version_flag, 10) catch |err| {
-        try std.fmt.format(stdErr, "ERROR: error parsing version: {s}\n", .{@errorName(err)});
+        try std.fmt.format(stderr, "ERROR: error parsing version: {s}\n", .{@errorName(err)});
         std.process.exit(1);
     };
 
@@ -50,7 +51,7 @@ pub fn main() anyerror!void {
         6 => .{.v6 = Uuid.v6.Source.init(random)},
         7 => .{.v7 = Uuid.v7.Source.init(random)},
         else => {
-            try std.fmt.format(stdErr, "ERROR: unsupported version\n", .{});
+            try std.fmt.format(stderr, "ERROR: unsupported version\n", .{});
             std.process.exit(1);
         },
     };
@@ -80,11 +81,11 @@ pub fn main() anyerror!void {
 
     if (print) {
         for (print_buffer) |uuid| {
-            try std.fmt.format(stdOut, "{}\n", .{uuid});
+            try std.fmt.format(stdout, "{}\n", .{uuid});
         }
     } else {
         const duration_per_uuid = @floatToInt(u64, @intToFloat(f64, duration) / @intToFloat(f64, number));
-        try std.fmt.format(stdOut, "{d} UUIDs in {} = {}/UUID\n", .{number, std.fmt.fmtDuration(duration), std.fmt.fmtDuration(duration_per_uuid)});
+        try std.fmt.format(stdout, "{d} UUIDs in {} = {}/UUID\n", .{number, std.fmt.fmtDuration(duration), std.fmt.fmtDuration(duration_per_uuid)});
     }
 }
 
