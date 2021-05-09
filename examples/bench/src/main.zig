@@ -15,7 +15,7 @@ pub fn main() anyerror!void {
     var rng = std.rand.DefaultPrng.init(@bitCast(u64, @truncate(i64, nanos)));
     const random = &rng.random;
 
-    Uuid.v1.clock.seed(random.int(u64));
+    var clock = Uuid.Clock.init(random);
 
     const params = comptime [_]clap.Param(clap.Help){
         clap.parseParam("-h, --help         Display this help and exit.") catch unreachable,
@@ -44,11 +44,11 @@ pub fn main() anyerror!void {
     };
 
     var source: Source = switch (version) {
-        1 => .{.v1 = Uuid.v1.Source.init(Uuid.v1.randomNode(random))},
+        1 => .{.v1 = Uuid.v1.Source.init(&clock, Uuid.v1.randomNode(random))},
         3 => .{.v3 = Uuid.v3.Source.init(Uuid.namespace.dns)},
         4 => .{.v4 = Uuid.v4.Source.init(random)},
         5 => .{.v5 = Uuid.v5.Source.init(Uuid.namespace.dns)},
-        6 => .{.v6 = Uuid.v6.Source.init(random)},
+        6 => .{.v6 = Uuid.v6.Source.init(&clock, random)},
         7 => .{.v7 = Uuid.v7.Source.init(random)},
         else => {
             try std.fmt.format(stderr, "ERROR: unsupported version\n", .{});
