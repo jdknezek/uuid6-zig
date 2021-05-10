@@ -319,7 +319,7 @@ pub const Clock = struct {
     random: *rand.Random,
 
     pub fn init(random: *rand.Random) Clock {
-        return .{.random = random};
+        return .{ .random = random };
     }
 
     fn next(self: *Clock, timestamp: u60) u14 {
@@ -520,7 +520,7 @@ pub const v6 = struct {
 
         const uuid1 = source.create();
         const uuid2 = source.create();
-        log.debug("{}\n{}\n", .{uuid1, uuid2});
+        log.debug("{}\n{}\n", .{ uuid1, uuid2 });
         testing.expect(!std.mem.eql(u8, &uuid1.bytes, &uuid2.bytes));
     }
 

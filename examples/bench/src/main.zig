@@ -44,12 +44,12 @@ pub fn main() anyerror!void {
     };
 
     var source: Source = switch (version) {
-        1 => .{.v1 = Uuid.v1.Source.init(&clock, Uuid.v1.randomNode(random))},
-        3 => .{.v3 = Uuid.v3.Source.init(Uuid.namespace.dns)},
-        4 => .{.v4 = Uuid.v4.Source.init(random)},
-        5 => .{.v5 = Uuid.v5.Source.init(Uuid.namespace.dns)},
-        6 => .{.v6 = Uuid.v6.Source.init(&clock, random)},
-        7 => .{.v7 = Uuid.v7.Source.init(random)},
+        1 => .{ .v1 = Uuid.v1.Source.init(&clock, Uuid.v1.randomNode(random)) },
+        3 => .{ .v3 = Uuid.v3.Source.init(Uuid.namespace.dns) },
+        4 => .{ .v4 = Uuid.v4.Source.init(random) },
+        5 => .{ .v5 = Uuid.v5.Source.init(Uuid.namespace.dns) },
+        6 => .{ .v6 = Uuid.v6.Source.init(&clock, random) },
+        7 => .{ .v7 = Uuid.v7.Source.init(random) },
         else => {
             try std.fmt.format(stderr, "ERROR: unsupported version\n", .{});
             std.process.exit(1);
@@ -60,7 +60,8 @@ pub fn main() anyerror!void {
 
     const number = if (args.option("--number")) |flag|
         try std.fmt.parseUnsigned(usize, flag, 10)
-    else 1;
+    else
+        1;
 
     const print = args.flag("--print");
 
@@ -85,7 +86,7 @@ pub fn main() anyerror!void {
         }
     } else {
         const duration_per_uuid = @floatToInt(u64, @intToFloat(f64, duration) / @intToFloat(f64, number));
-        try std.fmt.format(stdout, "{d} UUIDs in {} = {}/UUID\n", .{number, std.fmt.fmtDuration(duration), std.fmt.fmtDuration(duration_per_uuid)});
+        try std.fmt.format(stdout, "{d} UUIDs in {} = {}/UUID\n", .{ number, std.fmt.fmtDuration(duration), std.fmt.fmtDuration(duration_per_uuid) });
     }
 }
 
