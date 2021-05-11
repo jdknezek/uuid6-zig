@@ -57,10 +57,10 @@ test "format" {
     var buf: [36]u8 = undefined;
 
     _ = try std.fmt.bufPrint(&buf, "{}", .{nil});
-    testing.expectEqualStrings("00000000-0000-0000-0000-000000000000", &buf);
+    try testing.expectEqualStrings("00000000-0000-0000-0000-000000000000", &buf);
 
     _ = try std.fmt.bufPrint(&buf, "{}", .{fromInt(0x0123456789abcdef0123456789abcdef)});
-    testing.expectEqualStrings("01234567-89ab-cdef-0123-456789abcdef", &buf);
+    try testing.expectEqualStrings("01234567-89ab-cdef-0123-456789abcdef", &buf);
 }
 
 pub const ParseError = error{
@@ -107,7 +107,7 @@ pub fn parse(str: []const u8) ParseError!Uuid {
 
 test "parse" {
     const uuid = try parse("01234567-89ab-cdef-0123-456789abcdef");
-    testing.expectEqual(fromInt(0x0123456789abcdef0123456789abcdef).bytes, uuid.bytes);
+    try testing.expectEqual(fromInt(0x0123456789abcdef0123456789abcdef).bytes, uuid.bytes);
 }
 
 pub fn setVersion(uuid: *Uuid, version: u4) void {
@@ -151,18 +151,18 @@ pub fn getVariant(self: Uuid) Variant {
 
 test "variant and version" {
     var uuid = try parse("6ba7b810-9dad-11d1-80b4-00c04fd430c8");
-    testing.expectEqual(Variant.rfc4122, uuid.getVariant());
-    testing.expectEqual(@as(u4, 1), uuid.getVersion());
+    try testing.expectEqual(Variant.rfc4122, uuid.getVariant());
+    try testing.expectEqual(@as(u4, 1), uuid.getVersion());
 
     uuid = try parse("3d813cbb-47fb-32ba-91df-831e1593ac29");
-    testing.expectEqual(Variant.rfc4122, uuid.getVariant());
-    testing.expectEqual(@as(u4, 3), uuid.getVersion());
+    try testing.expectEqual(Variant.rfc4122, uuid.getVariant());
+    try testing.expectEqual(@as(u4, 3), uuid.getVersion());
 
     uuid = nil;
     uuid.setVariant(.rfc4122);
     uuid.setVersion(4);
-    testing.expectEqual(Variant.rfc4122, uuid.getVariant());
-    testing.expectEqual(@as(u4, 4), uuid.getVersion());
+    try testing.expectEqual(Variant.rfc4122, uuid.getVariant());
+    try testing.expectEqual(@as(u4, 4), uuid.getVersion());
 }
 
 pub const namespace = struct {
@@ -201,9 +201,9 @@ pub const v3 = struct {
     test "Source" {
         const source = Source.init(Uuid.namespace.dns);
         const uuid1 = source.create("www.example.com");
-        testing.expectEqual(Uuid.fromInt(0x5df418813aed351588a72f4a814cf09e), uuid1);
+        try testing.expectEqual(Uuid.fromInt(0x5df418813aed351588a72f4a814cf09e), uuid1);
         const uuid2 = source.create("www.example.com");
-        testing.expectEqual(uuid1, uuid2);
+        try testing.expectEqual(uuid1, uuid2);
     }
 
     pub fn create(ns: Uuid, name: []const u8) Uuid {
@@ -212,9 +212,9 @@ pub const v3 = struct {
 
     test "create" {
         const uuid1 = create(Uuid.namespace.dns, "www.example.com");
-        testing.expectEqual(Uuid.fromInt(0x5df418813aed351588a72f4a814cf09e), uuid1);
+        try testing.expectEqual(Uuid.fromInt(0x5df418813aed351588a72f4a814cf09e), uuid1);
         const uuid2 = create(Uuid.namespace.dns, "www.example.com");
-        testing.expectEqual(uuid1, uuid2);
+        try testing.expectEqual(uuid1, uuid2);
     }
 };
 
@@ -249,9 +249,9 @@ pub const v5 = struct {
     test "Source" {
         const source = Source.init(Uuid.namespace.dns);
         const uuid1 = source.create("www.example.com");
-        testing.expectEqual(Uuid.fromInt(0x2ed6657de927568b95e12665a8aea6a2), uuid1);
+        try testing.expectEqual(Uuid.fromInt(0x2ed6657de927568b95e12665a8aea6a2), uuid1);
         const uuid2 = source.create("www.example.com");
-        testing.expectEqual(uuid1, uuid2);
+        try testing.expectEqual(uuid1, uuid2);
     }
 
     pub fn create(ns: Uuid, name: []const u8) Uuid {
@@ -260,9 +260,9 @@ pub const v5 = struct {
 
     test "create" {
         const uuid1 = create(Uuid.namespace.dns, "www.example.com");
-        testing.expectEqual(Uuid.fromInt(0x2ed6657de927568b95e12665a8aea6a2), uuid1);
+        try testing.expectEqual(Uuid.fromInt(0x2ed6657de927568b95e12665a8aea6a2), uuid1);
         const uuid2 = create(Uuid.namespace.dns, "www.example.com");
-        testing.expectEqual(uuid1, uuid2);
+        try testing.expectEqual(uuid1, uuid2);
     }
 };
 
@@ -284,7 +284,7 @@ pub const v4 = struct {
 
         const uuid1 = create(&rng.random);
         const uuid2 = create(&rng.random);
-        testing.expect(!mem.eql(u8, &uuid1.bytes, &uuid2.bytes));
+        try testing.expect(!mem.eql(u8, &uuid1.bytes, &uuid2.bytes));
     }
 
     pub const Source = struct {
@@ -305,7 +305,7 @@ pub const v4 = struct {
 
         const uuid1 = source.create();
         const uuid2 = source.create();
-        testing.expect(!mem.eql(u8, &uuid1.bytes, &uuid2.bytes));
+        try testing.expect(!mem.eql(u8, &uuid1.bytes, &uuid2.bytes));
     }
 };
 
@@ -398,7 +398,7 @@ pub const v1 = struct {
         const uuid1 = create(nanosToTimestamp(time.nanoTimestamp()), &clock, node);
         const uuid2 = create(nanosToTimestamp(time.nanoTimestamp()), &clock, node);
         log.debug("{}\n{}\n", .{ uuid1, uuid2 });
-        testing.expect(!mem.eql(u8, &uuid1.bytes, &uuid2.bytes));
+        try testing.expect(!mem.eql(u8, &uuid1.bytes, &uuid2.bytes));
     }
 
     pub const Source = struct {
@@ -428,7 +428,7 @@ pub const v1 = struct {
         const uuid1 = source.create();
         const uuid2 = source.create();
         log.debug("{}\n{}\n", .{ uuid1, uuid2 });
-        testing.expect(!mem.eql(u8, &uuid1.bytes, &uuid2.bytes));
+        try testing.expect(!mem.eql(u8, &uuid1.bytes, &uuid2.bytes));
     }
 
     pub fn fromV6(uuidV6: Uuid) Uuid {
@@ -445,9 +445,9 @@ pub const v1 = struct {
 
         const uuidV6 = source.create();
         const uuidV1 = fromV6(uuidV6);
-        testing.expectEqual(uuidV6.getVariant(), uuidV1.getVariant());
-        testing.expectEqual(@as(u4, 1), uuidV1.getVersion());
-        testing.expectEqualSlices(u8, uuidV6.bytes[10..], uuidV1.bytes[10..]);
+        try testing.expectEqual(uuidV6.getVariant(), uuidV1.getVariant());
+        try testing.expectEqual(@as(u4, 1), uuidV1.getVersion());
+        try testing.expectEqualSlices(u8, uuidV6.bytes[10..], uuidV1.bytes[10..]);
     }
 };
 
@@ -492,7 +492,7 @@ pub const v6 = struct {
         const uuid1 = create(nanosToTimestamp(time.nanoTimestamp()), &clock, &rng.random);
         const uuid2 = create(nanosToTimestamp(time.nanoTimestamp()), &clock, &rng.random);
         log.debug("{}\n{}\n", .{ uuid1, uuid2 });
-        testing.expect(!mem.eql(u8, &uuid1.bytes, &uuid2.bytes));
+        try testing.expect(!mem.eql(u8, &uuid1.bytes, &uuid2.bytes));
     }
 
     pub const Source = struct {
@@ -521,7 +521,7 @@ pub const v6 = struct {
         const uuid1 = source.create();
         const uuid2 = source.create();
         log.debug("{}\n{}\n", .{ uuid1, uuid2 });
-        testing.expect(!std.mem.eql(u8, &uuid1.bytes, &uuid2.bytes));
+        try testing.expect(!std.mem.eql(u8, &uuid1.bytes, &uuid2.bytes));
     }
 
     pub fn fromV1(uuidV1: Uuid) Uuid {
@@ -538,9 +538,9 @@ pub const v6 = struct {
 
         const uuidV1 = source.create();
         const uuidV6 = fromV1(uuidV1);
-        testing.expectEqual(uuidV1.getVariant(), uuidV6.getVariant());
-        testing.expectEqual(@as(u4, 6), uuidV6.getVersion());
-        testing.expectEqualSlices(u8, uuidV1.bytes[10..], uuidV6.bytes[10..]);
+        try testing.expectEqual(uuidV1.getVariant(), uuidV6.getVariant());
+        try testing.expectEqual(@as(u4, 6), uuidV6.getVersion());
+        try testing.expectEqualSlices(u8, uuidV1.bytes[10..], uuidV6.bytes[10..]);
     }
 };
 
@@ -618,7 +618,7 @@ pub const v7 = struct {
         const uuid1 = create(time.nanoTimestamp(), &rng.random);
         const uuid2 = create(time.nanoTimestamp(), &rng.random);
         log.debug("{}\n{}\n", .{ uuid1, uuid2 });
-        testing.expect(!mem.eql(u8, &uuid1.bytes, &uuid2.bytes));
+        try testing.expect(!mem.eql(u8, &uuid1.bytes, &uuid2.bytes));
     }
 
     pub const Source = struct {
@@ -640,7 +640,7 @@ pub const v7 = struct {
         const uuid1 = source.create();
         const uuid2 = source.create();
         log.debug("{}\n{}\n", .{ uuid1, uuid2 });
-        testing.expect(!mem.eql(u8, &uuid1.bytes, &uuid2.bytes));
+        try testing.expect(!mem.eql(u8, &uuid1.bytes, &uuid2.bytes));
     }
 };
 
