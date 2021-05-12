@@ -15,7 +15,7 @@ pub const nil = fromInt(0);
 
 /// Creates a new UUID from a 16-byte slice. Only validates the slice length.
 pub fn fromSlice(bytes: []const u8) error{InvalidSize}!Uuid {
-    if (bytes.len != 16) return error.InvalidSize;
+    if (bytes.len < 16) return error.InvalidSize;
 
     var uuid: Uuid = undefined;
     std.mem.copy(u8, &uuid.bytes, bytes);
@@ -29,28 +29,43 @@ pub fn fromInt(value: u128) Uuid {
     return uuid;
 }
 
-fn writeHex(data: []const u8, writer: anytype) !void {
+fn formatHex(dst: []u8, src: []const u8) error{InvalidSize}!void {
+    if (dst.len < 2 * src.len) return error.InvalidSize;
+
     const alphabet = "0123456789abcdef";
 
-    var buf: [2]u8 = undefined;
-    for (data) |char| {
-        buf[0] = alphabet[char >> 4];
-        buf[1] = alphabet[char & 0xf];
-        try writer.writeAll(&buf);
+    var d: usize = 0;
+    var s: usize = 0;
+    while (d < dst.len and s < src.len) : ({
+        d += 2;
+        s += 1;
+    }) {
+        const byte = src[s];
+        dst[d] = alphabet[byte >> 4];
+        dst[d + 1] = alphabet[byte & 0xf];
     }
+}
+
+/// Formats the UUID to the buffer according to RFC-4122.
+pub fn formatBuf(self: Uuid, buf: []u8) error{InvalidSize}!void {
+    if (buf.len < 36) return error.InvalidSize;
+
+    formatHex(buf[0..8], self.bytes[0..4]) catch unreachable;
+    buf[8] = '-';
+    formatHex(buf[9..13], self.bytes[4..6]) catch unreachable;
+    buf[13] = '-';
+    formatHex(buf[14..18], self.bytes[6..8]) catch unreachable;
+    buf[18] = '-';
+    formatHex(buf[19..23], self.bytes[8..10]) catch unreachable;
+    buf[23] = '-';
+    formatHex(buf[24..], self.bytes[10..]) catch unreachable;
 }
 
 /// Formats the UUID according to RFC-4122.
 pub fn format(self: Uuid, comptime fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
-    try writeHex(self.bytes[0..4], writer);
-    try writer.writeByte('-');
-    try writeHex(self.bytes[4..6], writer);
-    try writer.writeByte('-');
-    try writeHex(self.bytes[6..8], writer);
-    try writer.writeByte('-');
-    try writeHex(self.bytes[8..10], writer);
-    try writer.writeByte('-');
-    try writeHex(self.bytes[10..], writer);
+    var buf: [36]u8 = undefined;
+    self.formatBuf(&buf) catch unreachable;
+    try writer.writeAll(&buf);
 }
 
 test "format" {
@@ -68,21 +83,21 @@ pub const ParseError = error{
     InvalidCharacter,
 };
 
-fn parseHex(dst: []u8, str: []const u8) ParseError!void {
-    if (str.len & 1 == 1) return error.InvalidSize;
+fn parseHex(dst: []u8, src: []const u8) ParseError!void {
+    if (src.len & 1 == 1 or dst.len < src.len / 2) return error.InvalidSize;
 
     var d: usize = 0;
     var s: usize = 0;
-    while (d < dst.len and s < str.len) : ({
+    while (d < dst.len and s < src.len) : ({
         d += 1;
         s += 2;
     }) {
-        dst[d] = switch (str[s]) {
+        dst[d] = switch (src[s]) {
             '0'...'9' => |c| c - '0',
             'A'...'F' => |c| c - 'A' + 10,
             'a'...'f' => |c| c - 'a' + 10,
             else => return error.InvalidCharacter,
-        } << 4 | switch (str[s + 1]) {
+        } << 4 | switch (src[s + 1]) {
             '0'...'9' => |c| c - '0',
             'A'...'F' => |c| c - 'A' + 10,
             'a'...'f' => |c| c - 'a' + 10,
@@ -93,7 +108,7 @@ fn parseHex(dst: []u8, str: []const u8) ParseError!void {
 
 /// Parses a RFC-4122-format string, tolerant of separators.
 pub fn parse(str: []const u8) ParseError!Uuid {
-    if (str.len != 36) return error.InvalidSize;
+    if (str.len < 36) return error.InvalidSize;
 
     var uuid: Uuid = undefined;
     try parseHex(uuid.bytes[0..4], str[0..8]);
