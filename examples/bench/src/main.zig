@@ -25,7 +25,7 @@ pub fn main() anyerror!void {
         clap.parseParam("-p, --print        Print generated UUIDs") catch unreachable,
     };
 
-    var args = try clap.parse(clap.Help, &params, allocator, null);
+    var args = try clap.parse(clap.Help, &params, .{});
     defer args.deinit();
 
     if (args.flag("--help")) {
