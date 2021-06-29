@@ -63,6 +63,8 @@ pub fn formatBuf(self: Uuid, buf: []u8) error{InvalidSize}!void {
 
 /// Formats the UUID according to RFC-4122.
 pub fn format(self: Uuid, comptime fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
+    _ = fmt;
+    _ = options;
     var buf: [36]u8 = undefined;
     self.formatBuf(&buf) catch unreachable;
     try writer.writeAll(&buf);
