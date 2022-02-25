@@ -285,7 +285,7 @@ pub const v5 = struct {
 
 /// A UUIDv4 is created from an entropy source.
 pub const v4 = struct {
-    pub fn create(random: *rand.Random) Uuid {
+    pub fn create(random: rand.Random) Uuid {
         var uuid: Uuid = undefined;
 
         // 128 bits of entropy
@@ -299,15 +299,15 @@ pub const v4 = struct {
     test "create" {
         var rng = rand.DefaultPrng.init(0);
 
-        const uuid1 = create(&rng.random);
-        const uuid2 = create(&rng.random);
+        const uuid1 = create(rng.random());
+        const uuid2 = create(rng.random());
         try testing.expect(!mem.eql(u8, &uuid1.bytes, &uuid2.bytes));
     }
 
     pub const Source = struct {
-        random: *rand.Random,
+        random: rand.Random,
 
-        pub fn init(random: *rand.Random) Source {
+        pub fn init(random: rand.Random) Source {
             return .{ .random = random };
         }
 
@@ -318,7 +318,7 @@ pub const v4 = struct {
 
     test "Source" {
         var rng = rand.DefaultPrng.init(0);
-        var source = Source.init(&rng.random);
+        var source = Source.init(rng.random());
 
         const uuid1 = source.create();
         const uuid2 = source.create();
@@ -333,15 +333,15 @@ pub const Clock = struct {
     mutex: std.Thread.Mutex = .{},
     timestamp: u60 = 0,
     sequence: u14 = 0,
-    random: *rand.Random,
+    random: rand.Random,
 
-    pub fn init(random: *rand.Random) Clock {
+    pub fn init(random: rand.Random) Clock {
         return .{ .random = random };
     }
 
     fn next(self: *Clock, timestamp: u60) u14 {
-        const lock = self.mutex.acquire();
-        defer lock.release();
+        self.mutex.lock();
+        defer self.mutex.unlock();
 
         if (timestamp > self.timestamp) {
             self.sequence = self.random.int(u14);
@@ -357,7 +357,7 @@ pub const Clock = struct {
 /// A UUIDv1 is created from a timestamp and node ID. The node ID is traditionally a MAC address but may randomized.
 pub const v1 = struct {
     /// Generates a random node ID suitable for a UUIDv1. This is basically a random MAC address with the multicast bit set.
-    pub fn randomNode(random: *rand.Random) [6]u8 {
+    pub fn randomNode(random: rand.Random) [6]u8 {
         var buf: [6]u8 = undefined;
         random.bytes(&buf);
         buf[0] |= 1;
@@ -409,8 +409,8 @@ pub const v1 = struct {
 
     test "create" {
         var rng = rand.DefaultPrng.init(0);
-        var clock = Clock.init(&rng.random);
-        const node = randomNode(&rng.random);
+        var clock = Clock.init(rng.random());
+        const node = randomNode(rng.random());
 
         const uuid1 = create(nanosToTimestamp(time.nanoTimestamp()), &clock, node);
         const uuid2 = create(nanosToTimestamp(time.nanoTimestamp()), &clock, node);
@@ -438,8 +438,8 @@ pub const v1 = struct {
 
     test "Source" {
         var rng = rand.DefaultPrng.init(0);
-        var clock = Clock.init(&rng.random);
-        const node = randomNode(&rng.random);
+        var clock = Clock.init(rng.random());
+        const node = randomNode(rng.random());
         const source = Source.init(&clock, node);
 
         const uuid1 = source.create();
@@ -457,8 +457,8 @@ pub const v1 = struct {
 
     test "fromV6" {
         var rng = rand.DefaultPrng.init(0);
-        var clock = Clock.init(&rng.random);
-        const source = v6.Source.init(&clock, &rng.random);
+        var clock = Clock.init(rng.random());
+        const source = v6.Source.init(&clock, rng.random());
 
         const uuidV6 = source.create();
         const uuidV1 = fromV6(uuidV6);
@@ -485,7 +485,7 @@ pub const v6 = struct {
         return @as(u60, hi) << 12 | @as(u60, lo);
     }
 
-    pub fn create(timestamp: u60, clock: *Clock, random: *rand.Random) Uuid {
+    pub fn create(timestamp: u60, clock: *Clock, random: rand.Random) Uuid {
         var uuid: Uuid = Uuid.nil;
 
         const sequence = clock.next(timestamp);
@@ -504,19 +504,19 @@ pub const v6 = struct {
 
     test "create" {
         var rng = rand.DefaultPrng.init(0);
-        var clock = Clock.init(&rng.random);
+        var clock = Clock.init(rng.random());
 
-        const uuid1 = create(nanosToTimestamp(time.nanoTimestamp()), &clock, &rng.random);
-        const uuid2 = create(nanosToTimestamp(time.nanoTimestamp()), &clock, &rng.random);
+        const uuid1 = create(nanosToTimestamp(time.nanoTimestamp()), &clock, rng.random());
+        const uuid2 = create(nanosToTimestamp(time.nanoTimestamp()), &clock, rng.random());
         log.debug("{}\n{}\n", .{ uuid1, uuid2 });
         try testing.expect(!mem.eql(u8, &uuid1.bytes, &uuid2.bytes));
     }
 
     pub const Source = struct {
         clock: *Clock,
-        random: *rand.Random,
+        random: rand.Random,
 
-        pub fn init(clock: *Clock, random: *rand.Random) Source {
+        pub fn init(clock: *Clock, random: rand.Random) Source {
             return .{
                 .clock = clock,
                 .random = random,
@@ -532,8 +532,8 @@ pub const v6 = struct {
 
     test "Source" {
         var rng = rand.DefaultPrng.init(0);
-        var clock = Clock.init(&rng.random);
-        const source = Source.init(&clock, &rng.random);
+        var clock = Clock.init(rng.random());
+        const source = Source.init(&clock, rng.random());
 
         const uuid1 = source.create();
         const uuid2 = source.create();
@@ -550,8 +550,8 @@ pub const v6 = struct {
 
     test "fromV6" {
         var rng = rand.DefaultPrng.init(0);
-        var clock = Clock.init(&rng.random);
-        const source = v1.Source.init(&clock, v1.randomNode(&rng.random));
+        var clock = Clock.init(rng.random());
+        const source = v1.Source.init(&clock, v1.randomNode(rng.random()));
 
         const uuidV1 = source.create();
         const uuidV6 = fromV1(uuidV1);
@@ -579,8 +579,8 @@ pub const v7 = struct {
         sequence: u8 = 0,
 
         fn next(self: *Self, nanos: *i128) u8 {
-            const lock = self.mutex.acquire();
-            defer lock.release();
+            self.mutex.lock();
+            defer self.mutex.unlock();
 
             if (nanos.* < self.nanos) {
                 nanos.* = self.nanos;
@@ -600,7 +600,7 @@ pub const v7 = struct {
     /// Binary value that can cover 1e9, the number of nanoseconds in a second
     const subsec_decimal_to_binary = @as(f64, 1 << 30);
 
-    pub fn create(nanos: i128, random: *rand.Random) Uuid {
+    pub fn create(nanos: i128, random: rand.Random) Uuid {
         var v_nanos = nanos;
         const sequence = clock.next(&v_nanos); // Get the clock sequence first in case it causes a nanosecond increment.
         const secs = @truncate(u36, @bitCast(u128, @divTrunc(v_nanos, time.ns_per_s)));
@@ -632,16 +632,16 @@ pub const v7 = struct {
     test "create" {
         var rng = rand.DefaultPrng.init(0);
 
-        const uuid1 = create(time.nanoTimestamp(), &rng.random);
-        const uuid2 = create(time.nanoTimestamp(), &rng.random);
+        const uuid1 = create(time.nanoTimestamp(), rng.random());
+        const uuid2 = create(time.nanoTimestamp(), rng.random());
         log.debug("{}\n{}\n", .{ uuid1, uuid2 });
         try testing.expect(!mem.eql(u8, &uuid1.bytes, &uuid2.bytes));
     }
 
     pub const Source = struct {
-        random: *rand.Random,
+        random: rand.Random,
 
-        pub fn init(random: *rand.Random) Source {
+        pub fn init(random: rand.Random) Source {
             return .{ .random = random };
         }
 
@@ -652,7 +652,7 @@ pub const v7 = struct {
 
     test "Source" {
         var rng = rand.DefaultPrng.init(0);
-        const source = Source.init(&rng.random);
+        const source = Source.init(rng.random());
 
         const uuid1 = source.create();
         const uuid2 = source.create();

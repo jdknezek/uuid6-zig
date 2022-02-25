@@ -8,12 +8,12 @@ pub fn main() anyerror!void {
 
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer if (gpa.deinit()) std.fmt.format(stderr, "WARNING: memory leak!\n", .{}) catch unreachable;
-    const allocator = &gpa.allocator;
+    const allocator = gpa.allocator();
 
     const nanos = std.time.nanoTimestamp();
 
     var rng = std.rand.DefaultPrng.init(@bitCast(u64, @truncate(i64, nanos)));
-    const random = &rng.random;
+    const random = rng.random();
 
     var clock = Uuid.Clock.init(random);
 
