@@ -561,68 +561,14 @@ pub const v6 = struct {
     }
 };
 
-/// A UUIDv7 is created from a timestamp and entropy source, with arbitrary subsecond precision.
-/// This implementation uses 30 bits for nanosecond precision, 8 bits for the clock sequence (overflowing into nanoseconds), and the remaining 48 bits for entropy.
+/// A UUIDv7 is created from a timestamp and entropy source. It uses UNIX millisecond timestamps and sorts lexicographically between milliseconds.
 pub const v7 = struct {
-    // v7 allocates:
-    //   - 36 bits for Unix seconds
-    //   - 24 bits for subsecond precision
-    //   - 62 bits for subseconds, clock sequence, or entropy
-    // Zig has timestamp precision down to the ns; 1s = 1e9ns, so ns can be represented in 30 bits, leaving 56 bits for clock sequence and entropy.
-    // Let's use 8 bits for clock sequence (256 UUIDs/ns), leaving 48 bits for entropy, matching v1 & v6.
-    // The clock can overflow into ns, because if we're exceeding 256 UUIDs/ns, our clock probably isn't actually ns-precise - especially considering the simple UUIDv4 takes ~16ns to generate.
-    var clock = struct {
-        const Self = @This();
-
-        mutex: std.Thread.Mutex = .{},
-        nanos: i128 = 0,
-        sequence: u8 = 0,
-
-        fn next(self: *Self, nanos: *i128) u8 {
-            self.mutex.lock();
-            defer self.mutex.unlock();
-
-            if (nanos.* < self.nanos) {
-                nanos.* = self.nanos;
-            } else if (nanos.* > self.nanos) {
-                self.sequence = 0;
-                self.nanos = nanos.*;
-            }
-
-            const sequence = self.sequence;
-            if (@addWithOverflow(u8, self.sequence, 1, &self.sequence)) {
-                self.nanos += 1;
-            }
-            return sequence;
-        }
-    }{};
-
-    /// Binary value that can cover 1e9, the number of nanoseconds in a second
-    const subsec_decimal_to_binary = @as(f64, 1 << 30);
-
-    pub fn create(nanos: i128, random: rand.Random) Uuid {
-        var v_nanos = nanos;
-        const sequence = clock.next(&v_nanos); // Get the clock sequence first in case it causes a nanosecond increment.
-        const secs = @truncate(u36, @bitCast(u128, @divTrunc(v_nanos, time.ns_per_s)));
-        const sub_dec = @intToFloat(f64, @mod(v_nanos, time.ns_per_s)) / time.ns_per_s;
-        const sub = @floatToInt(u30, sub_dec * subsec_decimal_to_binary);
-
+    pub fn create(millis: i64, random: rand.Random) Uuid {
         var uuid: Uuid = nil;
-        // 36 bits of Unix seconds
-        mem.writeIntBig(u32, @ptrCast(*[4]u8, &uuid.bytes[0]), @truncate(u32, secs >> 4));
-        uuid.bytes[4] = @truncate(u8, secs << 4);
-        // 12 bits of nanoseconds
-        uuid.bytes[4] = @truncate(u8, sub >> 26);
-        uuid.bytes[5] = @truncate(u8, sub >> 18);
-        // 12 bits of nanoseconds
-        uuid.bytes[6] = @truncate(u8, sub >> 14);
-        uuid.bytes[7] = @truncate(u8, sub >> 6);
-        // 6 bits of nanoseconds
-        uuid.bytes[8] = @truncate(u6, sub);
-        // 8 bits of clock sequence
-        uuid.bytes[9] = sequence;
-        // 48 bits of entropy
-        random.bytes(uuid.bytes[10..]);
+        // 48 bits of Unix milliseconds
+        mem.writeIntBig(u48, @ptrCast(*[6]u8, &uuid.bytes[0]), @truncate(u48, @bitCast(u64, millis)));
+        // 80 bits of entropy (74 of which we'll keep)
+        random.bytes(uuid.bytes[6..]);
 
         uuid.setVariant(.rfc4122);
         uuid.setVersion(7);
@@ -632,8 +578,8 @@ pub const v7 = struct {
     test "create" {
         var rng = rand.DefaultPrng.init(0);
 
-        const uuid1 = create(time.nanoTimestamp(), rng.random());
-        const uuid2 = create(time.nanoTimestamp(), rng.random());
+        const uuid1 = create(time.milliTimestamp(), rng.random());
+        const uuid2 = create(time.milliTimestamp(), rng.random());
         log.debug("{}\n{}\n", .{ uuid1, uuid2 });
         try testing.expect(!mem.eql(u8, &uuid1.bytes, &uuid2.bytes));
     }
@@ -646,7 +592,7 @@ pub const v7 = struct {
         }
 
         pub fn create(self: Source) Uuid {
-            return v7.create(time.nanoTimestamp(), self.random);
+            return v7.create(time.milliTimestamp(), self.random);
         }
     };
 
