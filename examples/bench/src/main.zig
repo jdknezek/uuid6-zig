@@ -16,6 +16,7 @@ pub fn main() anyerror!void {
     const random = rng.random();
 
     var clock = Uuid.Clock.init(random);
+    var node_source = Uuid.v1.RandomNodeSource{ .random = random };
 
     const params = comptime [_]clap.Param(clap.Help){
         clap.parseParam("-h, --help         Display this help and exit.") catch unreachable,
@@ -44,7 +45,7 @@ pub fn main() anyerror!void {
     };
 
     var source: Source = switch (version) {
-        1 => .{ .v1 = Uuid.v1.Source.init(&clock, Uuid.v1.randomNode(random)) },
+        1 => .{ .v1 = Uuid.v1.Source.init(&clock, node_source.nodeSource()) },
         3 => .{ .v3 = Uuid.v3.Source.init(Uuid.namespace.dns) },
         4 => .{ .v4 = Uuid.v4.Source.init(random) },
         5 => .{ .v5 = Uuid.v5.Source.init(Uuid.namespace.dns) },

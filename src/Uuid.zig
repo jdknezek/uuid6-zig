@@ -418,34 +418,111 @@ pub const v1 = struct {
         try testing.expect(!mem.eql(u8, &uuid1.bytes, &uuid2.bytes));
     }
 
-    pub const Source = struct {
-        clock: *Clock,
+    /// Interface to generate a node ID.
+    pub const NodeSource = struct {
+        ptr: *anyopaque,
+        nodeFn: fn (*anyopaque) [6]u8,
+
+        pub fn init(pointer: anytype, comptime nodeFn: fn (ptr: @TypeOf(pointer)) [6]u8) NodeSource {
+            const Ptr = @TypeOf(pointer);
+            std.debug.assert(@typeInfo(Ptr) == .Pointer); // Must be a pointer
+            std.debug.assert(@typeInfo(Ptr).Pointer.size == .One); // Must be a single-item pointer
+            std.debug.assert(@typeInfo(@typeInfo(Ptr).Pointer.child) == .Struct); // Must point to a struct
+            const gen = struct {
+                fn node(ptr: *anyopaque) [6]u8 {
+                    const alignment = @typeInfo(Ptr).Pointer.alignment;
+                    const self = @ptrCast(Ptr, @alignCast(alignment, ptr));
+                    return nodeFn(self);
+                }
+            };
+
+            return .{
+                .ptr = pointer,
+                .nodeFn = gen.node,
+            };
+        }
+
+        pub fn node(self: NodeSource) [6]u8 {
+            return self.nodeFn(self.ptr);
+        }
+    };
+
+    /// Re-use a fixed node ID. You should probably not use this except for compatibility.
+    pub const FixedNodeSource = struct {
         node: [6]u8,
 
-        pub fn init(clock: *Clock, node: [6]u8) Source {
+        fn nodeFn(self: *FixedNodeSource) [6]u8 {
+            return self.node;
+        }
+
+        pub fn nodeSource(self: *FixedNodeSource) NodeSource {
+            return NodeSource.init(self, nodeFn);
+        }
+    };
+
+    test "FixedNodeSource" {
+        var rng = rand.DefaultPrng.init(0);
+        var source = FixedNodeSource{ .node = randomNode(rng.random()) };
+        const node_source = source.nodeSource();
+
+        const node1 = node_source.node();
+        const node2 = node_source.node();
+        try testing.expect(mem.eql(u8, &node1, &node2));
+    }
+
+    /// Generate a new random node ID per UUID.
+    pub const RandomNodeSource = struct {
+        random: rand.Random,
+
+        fn nodeFn(self: *RandomNodeSource) [6]u8 {
+            return randomNode(self.random);
+        }
+
+        pub fn nodeSource(self: *RandomNodeSource) NodeSource {
+            return NodeSource.init(self, nodeFn);
+        }
+    };
+
+    test "RandomNodeSource" {
+        var rng = rand.DefaultPrng.init(0);
+        var source = RandomNodeSource{ .random = rng.random() };
+        const node_source = source.nodeSource();
+
+        const node1 = node_source.node();
+        const node2 = node_source.node();
+        try testing.expect(!mem.eql(u8, &node1, &node2));
+    }
+
+    pub const Source = struct {
+        clock: *Clock,
+        node_source: NodeSource,
+
+        pub fn init(clock: *Clock, node_source: NodeSource) Source {
             return .{
                 .clock = clock,
-                .node = node,
+                .node_source = node_source,
             };
         }
 
         pub fn create(self: Source) Uuid {
             const nanos = time.nanoTimestamp();
             const timestamp = nanosToTimestamp(nanos);
-            return v1.create(timestamp, self.clock, self.node);
+            const node = self.node_source.node();
+            return v1.create(timestamp, self.clock, node);
         }
     };
 
     test "Source" {
         var rng = rand.DefaultPrng.init(0);
         var clock = Clock.init(rng.random());
-        const node = randomNode(rng.random());
-        const source = Source.init(&clock, node);
+        var node_source = RandomNodeSource{ .random = rng.random() };
+        const source = Source.init(&clock, node_source.nodeSource());
 
         const uuid1 = source.create();
         const uuid2 = source.create();
         log.debug("{}\n{}\n", .{ uuid1, uuid2 });
         try testing.expect(!mem.eql(u8, &uuid1.bytes, &uuid2.bytes));
+        try testing.expect(!mem.eql(u8, uuid1.bytes[10..], uuid2.bytes[10..]));
     }
 
     pub fn fromV6(uuidV6: Uuid) Uuid {
@@ -551,13 +628,13 @@ pub const v6 = struct {
     test "fromV6" {
         var rng = rand.DefaultPrng.init(0);
         var clock = Clock.init(rng.random());
-        const source = v1.Source.init(&clock, v1.randomNode(rng.random()));
+        var node_source = v1.RandomNodeSource{ .random = rng.random() };
+        const source = v1.Source.init(&clock, node_source.nodeSource());
 
         const uuidV1 = source.create();
         const uuidV6 = fromV1(uuidV1);
         try testing.expectEqual(uuidV1.getVariant(), uuidV6.getVariant());
         try testing.expectEqual(@as(u4, 6), uuidV6.getVersion());
-        try testing.expectEqualSlices(u8, uuidV1.bytes[10..], uuidV6.bytes[10..]);
     }
 };
 
