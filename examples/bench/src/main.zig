@@ -18,29 +18,23 @@ pub fn main() anyerror!void {
     var clock = Uuid.Clock.init(random);
     var node_source = Uuid.v1.RandomNodeSource{ .random = random };
 
-    const params = comptime [_]clap.Param(clap.Help){
-        clap.parseParam("-h, --help         Display this help and exit.") catch unreachable,
-        clap.parseParam("-v, --version <v>  UUID version") catch unreachable,
-        clap.parseParam("-d, --domain <d>   Domain (for v3 & v5)") catch unreachable,
-        clap.parseParam("-n, --number <n>   Number of UUIDs to generate (default 1)") catch unreachable,
-        clap.parseParam("-p, --print        Print generated UUIDs") catch unreachable,
-    };
+    const params = comptime clap.parseParamsComptime(
+        \\-h, --help             Display this help and exit.
+        \\-v, --version <u8>     UUID version
+        \\-d, --domain <string>  Domain (for v3 & v5)
+        \\-n, --number <usize>   Number of UUIDs to generate (default 1)
+        \\-p, --print            Print generated UUIDs
+    );
 
-    var args = try clap.parse(clap.Help, &params, .{});
+    var args = try clap.parse(clap.Help, &params, clap.parsers.default, .{});
     defer args.deinit();
 
-    if (args.flag("--help")) {
-        try clap.help(stdout, &params);
-        return;
+    if (args.args.help) {
+        return clap.help(std.io.getStdErr().writer(), clap.Help, &params, .{});
     }
 
-    const version_flag = args.option("--version") orelse {
+    const version = args.args.version orelse {
         try std.fmt.format(stderr, "ERROR: version is required\n", .{});
-        std.process.exit(1);
-    };
-
-    const version = std.fmt.parseUnsigned(u4, version_flag, 10) catch |err| {
-        try std.fmt.format(stderr, "ERROR: error parsing version: {s}\n", .{@errorName(err)});
         std.process.exit(1);
     };
 
@@ -57,14 +51,11 @@ pub fn main() anyerror!void {
         },
     };
 
-    const domain = args.option("--domain") orelse "www.example.com";
+    const domain = args.args.domain orelse "www.example.com";
 
-    const number = if (args.option("--number")) |flag|
-        try std.fmt.parseUnsigned(usize, flag, 10)
-    else
-        1;
+    const number = args.args.number orelse 1;
 
-    const print = args.flag("--print");
+    const print = args.args.print;
 
     var print_buffer = try allocator.alloc(Uuid, if (print) number else 0);
     defer allocator.free(print_buffer);
