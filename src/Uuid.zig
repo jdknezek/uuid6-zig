@@ -421,7 +421,7 @@ pub const v1 = struct {
     /// Interface to generate a node ID.
     pub const NodeSource = struct {
         ptr: *anyopaque,
-        nodeFn: fn (*anyopaque) [6]u8,
+        nodeFn: std.meta.FnPtr(fn (*anyopaque) [6]u8),
 
         pub fn init(pointer: anytype, comptime nodeFn: fn (ptr: @TypeOf(pointer)) [6]u8) NodeSource {
             const Ptr = @TypeOf(pointer);
@@ -684,6 +684,6 @@ pub const v7 = struct {
     }
 };
 
-test "" {
+test {
     std.testing.refAllDecls(Uuid);
 }
