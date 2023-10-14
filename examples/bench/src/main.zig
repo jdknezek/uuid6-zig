@@ -7,12 +7,12 @@ pub fn main() anyerror!void {
     const stdout = std.io.getStdOut().writer();
 
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer if (gpa.deinit()) std.fmt.format(stderr, "WARNING: memory leak!\n", .{}) catch unreachable;
+    defer if (gpa.deinit() == .leak) std.fmt.format(stderr, "WARNING: memory leak!\n", .{}) catch unreachable;
     const allocator = gpa.allocator();
 
     const nanos = std.time.nanoTimestamp();
 
-    var rng = std.rand.DefaultPrng.init(@bitCast(u64, @truncate(i64, nanos)));
+    var rng = std.rand.DefaultPrng.init(@bitCast(@as(i64, @truncate(nanos))));
     const random = rng.random();
 
     var clock = Uuid.Clock.init(random);
@@ -29,7 +29,7 @@ pub fn main() anyerror!void {
     var args = try clap.parse(clap.Help, &params, clap.parsers.default, .{});
     defer args.deinit();
 
-    if (args.args.help) {
+    if (args.args.help != 0) {
         return clap.help(std.io.getStdErr().writer(), clap.Help, &params, .{});
     }
 
@@ -57,7 +57,7 @@ pub fn main() anyerror!void {
 
     const print = args.args.print;
 
-    var print_buffer = try allocator.alloc(Uuid, if (print) number else 0);
+    var print_buffer = try allocator.alloc(Uuid, if (print > 0) number else 0);
     defer allocator.free(print_buffer);
 
     var timer = try std.time.Timer.start();
@@ -65,19 +65,19 @@ pub fn main() anyerror!void {
     var i: usize = 0;
     while (i < number) : (i += 1) {
         const uuid = source.create(domain);
-        if (print) {
+        if (print > 0) {
             print_buffer[i] = uuid;
         }
     }
 
     const duration = timer.read();
 
-    if (print) {
+    if (print > 0) {
         for (print_buffer) |uuid| {
             try std.fmt.format(stdout, "{}\n", .{uuid});
         }
     } else {
-        const duration_per_uuid = @floatToInt(u64, @intToFloat(f64, duration) / @intToFloat(f64, number));
+        const duration_per_uuid = @as(u64, @intFromFloat(@as(f64, @floatFromInt(duration)) / @as(f64, @floatFromInt(number))));
         try std.fmt.format(stdout, "{d} UUIDs in {} = {}/UUID\n", .{ number, std.fmt.fmtDuration(duration), std.fmt.fmtDuration(duration_per_uuid) });
     }
 }

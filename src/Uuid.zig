@@ -133,7 +133,7 @@ pub fn setVersion(uuid: *Uuid, version: u4) void {
 
 /// Returns the UUID version number.
 pub fn getVersion(self: Uuid) u4 {
-    return @truncate(u4, self.bytes[6] >> 4);
+    return @truncate(self.bytes[6] >> 4);
 }
 
 pub const Variant = enum {
@@ -371,22 +371,22 @@ pub const v1 = struct {
     pub fn nanosToTimestamp(nanos: i128) u60 {
         const intervals = @divTrunc(nanos, 100);
         const from_epoch = intervals + epoch_intervals;
-        return @truncate(u60, @bitCast(u128, from_epoch));
+        return @as(u60, @truncate(@as(u128, @bitCast(from_epoch))));
     }
 
     fn setTimestamp(uuid: *Uuid, timestamp: u60) void {
         // time-low
-        mem.writeIntBig(u32, @ptrCast(*[4]u8, &uuid.bytes[0]), @truncate(u32, timestamp));
+        mem.writeIntBig(u32, @as(*[4]u8, @ptrCast(&uuid.bytes[0])), @as(u32, @truncate(timestamp)));
         // time-mid
-        mem.writeIntBig(u16, @ptrCast(*[2]u8, &uuid.bytes[4]), @truncate(u16, timestamp >> 32));
+        mem.writeIntBig(u16, @as(*[2]u8, @ptrCast(&uuid.bytes[4])), @as(u16, @truncate(timestamp >> 32)));
         // time-high
-        mem.writeIntBig(u16, @ptrCast(*[2]u8, &uuid.bytes[6]), @truncate(u16, timestamp >> 48));
+        mem.writeIntBig(u16, @as(*[2]u8, @ptrCast(&uuid.bytes[6])), @as(u16, @truncate(timestamp >> 48)));
     }
 
     pub fn getTimestamp(uuid: Uuid) u60 {
-        const lo = mem.readIntBig(u32, @ptrCast(*const [4]u8, &uuid.bytes[0]));
-        const md = mem.readIntBig(u16, @ptrCast(*const [2]u8, &uuid.bytes[4]));
-        const hi = mem.readIntBig(u16, @ptrCast(*const [2]u8, &uuid.bytes[6])) & 0xfff;
+        const lo = mem.readIntBig(u32, @as(*const [4]u8, @ptrCast(&uuid.bytes[0])));
+        const md = mem.readIntBig(u16, @as(*const [2]u8, @ptrCast(&uuid.bytes[4])));
+        const hi = mem.readIntBig(u16, @as(*const [2]u8, @ptrCast(&uuid.bytes[6]))) & 0xfff;
         return @as(u60, hi) << 48 | @as(u60, md) << 32 | @as(u60, lo);
     }
 
@@ -398,7 +398,7 @@ pub const v1 = struct {
         // 60 bits of timestamp
         setTimestamp(&uuid, timestamp);
         // 14 bits of clock sequence
-        mem.writeIntBig(u16, @ptrCast(*[2]u8, &uuid.bytes[8]), sequence);
+        mem.writeIntBig(u16, @as(*[2]u8, @ptrCast(&uuid.bytes[8])), sequence);
         // 48 bits of node ID
         mem.copy(u8, uuid.bytes[10..], &node);
 
@@ -421,18 +421,18 @@ pub const v1 = struct {
     /// Interface to generate a node ID.
     pub const NodeSource = struct {
         ptr: *anyopaque,
-        nodeFn: std.meta.FnPtr(fn (*anyopaque) [6]u8),
+        nodeFn: *const fn (*anyopaque) [6]u8,
 
-        pub fn init(pointer: anytype, comptime nodeFn: fn (ptr: @TypeOf(pointer)) [6]u8) NodeSource {
+        pub fn init(pointer: anytype) NodeSource {
             const Ptr = @TypeOf(pointer);
-            std.debug.assert(@typeInfo(Ptr) == .Pointer); // Must be a pointer
-            std.debug.assert(@typeInfo(Ptr).Pointer.size == .One); // Must be a single-item pointer
-            std.debug.assert(@typeInfo(@typeInfo(Ptr).Pointer.child) == .Struct); // Must point to a struct
+            const ptr_info = @typeInfo(Ptr);
+            std.debug.assert(ptr_info == .Pointer); // Must be a pointer
+            std.debug.assert(ptr_info.Pointer.size == .One); // Must be a single-item pointer
+            std.debug.assert(@typeInfo(ptr_info.Pointer.child) == .Struct); // Must point to a struct
             const gen = struct {
                 fn node(ptr: *anyopaque) [6]u8 {
-                    const alignment = @typeInfo(Ptr).Pointer.alignment;
-                    const self = @ptrCast(Ptr, @alignCast(alignment, ptr));
-                    return nodeFn(self);
+                    const self: Ptr = @ptrCast(@alignCast(ptr));
+                    return ptr_info.Pointer.child.node(self);
                 }
             };
 
@@ -451,12 +451,12 @@ pub const v1 = struct {
     pub const FixedNodeSource = struct {
         node: [6]u8,
 
-        fn nodeFn(self: *FixedNodeSource) [6]u8 {
+        fn node(self: *FixedNodeSource) [6]u8 {
             return self.node;
         }
 
         pub fn nodeSource(self: *FixedNodeSource) NodeSource {
-            return NodeSource.init(self, nodeFn);
+            return NodeSource.init(self);
         }
     };
 
@@ -474,12 +474,12 @@ pub const v1 = struct {
     pub const RandomNodeSource = struct {
         random: rand.Random,
 
-        fn nodeFn(self: *RandomNodeSource) [6]u8 {
+        fn node(self: *RandomNodeSource) [6]u8 {
             return randomNode(self.random);
         }
 
         pub fn nodeSource(self: *RandomNodeSource) NodeSource {
-            return NodeSource.init(self, nodeFn);
+            return NodeSource.init(self);
         }
     };
 
@@ -551,14 +551,14 @@ pub const v6 = struct {
 
     fn setTimestamp(uuid: *Uuid, timestamp: u60) void {
         // time-high
-        mem.writeIntBig(u48, @ptrCast(*[6]u8, &uuid.bytes[0]), @truncate(u48, timestamp >> 12));
+        mem.writeIntBig(u48, @as(*[6]u8, @ptrCast(&uuid.bytes[0])), @as(u48, @truncate(timestamp >> 12)));
         // time-low
-        mem.writeIntBig(u16, @ptrCast(*[2]u8, &uuid.bytes[6]), @truncate(u16, timestamp & 0xfff));
+        mem.writeIntBig(u16, @as(*[2]u8, @ptrCast(&uuid.bytes[6])), @as(u16, @truncate(timestamp & 0xfff)));
     }
 
     pub fn getTimestamp(uuid: Uuid) u60 {
-        const hi = mem.readIntBig(u48, @ptrCast(*const [6]u8, &uuid.bytes[0]));
-        const lo = mem.readIntBig(u16, @ptrCast(*const [2]u8, &uuid.bytes[6])) & 0xfff;
+        const hi = mem.readIntBig(u48, @as(*const [6]u8, @ptrCast(&uuid.bytes[0])));
+        const lo = mem.readIntBig(u16, @as(*const [2]u8, @ptrCast(&uuid.bytes[6]))) & 0xfff;
         return @as(u60, hi) << 12 | @as(u60, lo);
     }
 
@@ -570,7 +570,7 @@ pub const v6 = struct {
         // 60 bits of timestamp
         setTimestamp(&uuid, timestamp);
         // 14 bits of clock sequence
-        mem.writeIntBig(u16, @ptrCast(*[2]u8, &uuid.bytes[8]), sequence);
+        mem.writeIntBig(u16, @as(*[2]u8, @ptrCast(&uuid.bytes[8])), sequence);
         // 48 bits of entropy
         random.bytes(uuid.bytes[10..]);
 
@@ -643,7 +643,7 @@ pub const v7 = struct {
     pub fn create(millis: i64, random: rand.Random) Uuid {
         var uuid: Uuid = nil;
         // 48 bits of Unix milliseconds
-        mem.writeIntBig(u48, @ptrCast(*[6]u8, &uuid.bytes[0]), @truncate(u48, @bitCast(u64, millis)));
+        mem.writeIntBig(u48, @as(*[6]u8, @ptrCast(&uuid.bytes[0])), @as(u48, @truncate(@as(u64, @bitCast(millis)))));
         // 80 bits of entropy (74 of which we'll keep)
         random.bytes(uuid.bytes[6..]);
 
