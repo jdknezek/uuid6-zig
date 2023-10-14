@@ -1,6 +1,6 @@
 const std = @import("std");
 
-pub fn build(b: *std.build.Builder) void {
+pub fn build(b: *std.Build) void {
     // Standard target options allows the person running `zig build` to choose
     // what target to build for. Here we do not override the defaults, which
     // means any target is allowed, and the default is native. Other options
@@ -9,17 +9,25 @@ pub fn build(b: *std.build.Builder) void {
 
     // Standard release options allow the person running `zig build` to select
     // between Debug, ReleaseSafe, ReleaseFast, and ReleaseSmall.
-    const mode = b.standardReleaseOptions();
+    const optimize = b.standardOptimizeOption(.{});
 
-    const exe = b.addExecutable("bench", "src/main.zig");
-    exe.addPackagePath("clap", "lib/zig-clap/clap.zig");
-    exe.addPackagePath("uuid", "../../src/Uuid.zig");
-    exe.setTarget(target);
-    exe.setBuildMode(mode);
-    if (b.option(bool, "single-threaded", "Single-threaded optimizations")) |st| exe.single_threaded = st;
-    exe.install();
+    const single_threaded = b.option(bool, "single-threaded", "Single-threaded optimizations") orelse false;
+    const exe = b.addExecutable(.{
+        .name = "bench",
+        .root_source_file = .{ .path = "src/main.zig" },
+        .target = target,
+        .optimize = optimize,
+        .single_threaded = single_threaded,
+    });
 
-    const run_cmd = exe.run();
+    var clap = b.addModule("clap", .{ .source_file = .{ .path = "lib/zig-clap/clap.zig" } });
+    exe.addModule("clap", clap);
+    var uuid = b.addModule("uuid", .{ .source_file = .{ .path = "../../src/Uuid.zig" } });
+    exe.addModule("uuid", uuid);
+
+    b.installArtifact(exe);
+
+    const run_cmd = b.addRunArtifact(exe);
     run_cmd.step.dependOn(b.getInstallStep());
     if (b.args) |args| {
         run_cmd.addArgs(args);
