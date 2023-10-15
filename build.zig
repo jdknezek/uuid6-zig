@@ -7,7 +7,7 @@ pub fn build(b: *std.Build) void {
     const optimize = b.standardOptimizeOption(.{});
 
     const lib = b.addStaticLibrary(.{
-        .name = "zig-uuid6",
+        .name = "uuid6",
         .root_source_file = .{ .path = "src/Uuid.zig" },
         .target = target,
         .optimize = optimize,
