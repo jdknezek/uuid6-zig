@@ -6,6 +6,9 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
+    // Required to be used as dependency in Zig package manager
+    _ = b.addModule("uuid6", .{ .source_file = .{ .path = "src/Uuid.zig" } });
+
     const lib = b.addStaticLibrary(.{
         .name = "uuid6",
         .root_source_file = .{ .path = "src/Uuid.zig" },
