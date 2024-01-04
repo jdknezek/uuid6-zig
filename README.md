@@ -1,6 +1,6 @@
 # uuid6-zig
 
-This is a prototype [UUIDv6](https://github.com/uuid6/uuid6-ietf-draft) draft 03 implementation in [Zig](https://github.com/ziglang/zig). It also includes versions 1 & 3-5 for comparison.
+This is a prototype [UUIDv6](https://github.com/uuid6/uuid6-ietf-draft) draft 03 implementation in [Zig](https://github.com/ziglang/zig). It also includes versions 1 & 3-7 for comparison.
 
 ## Installation
 
